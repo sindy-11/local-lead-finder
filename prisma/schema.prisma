@@ -1,0 +1,62 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+model Business {
+  id           String   @id @default(cuid())
+  source       String
+  sourceId     String
+  searchCategory String?
+  // Only demo or independently supplied data. Google content is never persisted.
+  data         String?
+  noWebsiteListed Boolean @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  lead         SavedLead?
+  searches     SearchBusiness[]
+  @@unique([source, sourceId])
+}
+model Search {
+  id        String @id @default(cuid())
+  city      String
+  category  String
+  mode      String
+  requested Int
+  found     Int
+  operations Int
+  createdAt DateTime @default(now())
+  businesses SearchBusiness[]
+}
+model SearchBusiness {
+  searchId String
+  businessId String
+  search Search @relation(fields: [searchId], references: [id], onDelete: Cascade)
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  @@id([searchId, businessId])
+}
+model SavedLead {
+  id String @id @default(cuid())
+  businessId String @unique
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  saved Boolean @default(true)
+  contactStatus String @default("NEW")
+  websiteStatus String?
+  verificationNote String @default("")
+  notes String @default("")
+  instagram String?
+  whatsapp String?
+  email String?
+  manualName String?
+  manualPhone String?
+  manualWebsite String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+model Template {
+  category String @id
+  url String
+  updatedAt DateTime @updatedAt
+}

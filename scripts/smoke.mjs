@@ -1,0 +1,28 @@
+import assert from 'node:assert/strict';
+import ExcelJS from 'exceljs';
+import { PrismaClient } from '@prisma/client';
+const base=process.env.TEST_BASE_URL??'http://127.0.0.1:3011';
+async function request(path,method='GET',body,origin=base){const response=await fetch(base+path,{method,headers:{Origin:origin,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});const json=await response.json();return {status:response.status,...json};}
+const before=await request('/api/data?mode=demo');assert.equal(before.status,200);assert.equal(before.configured,false);
+const searchBody={city:`Smoke Test ${Date.now()}`,category:'TATTOO',limit:50,mode:'demo'};
+const first=await request('/api/search','POST',searchBody);assert.equal(first.status,200);assert.equal(first.leads.length,12);assert.equal(first.operations,0);
+const id=first.leads[0].id;
+const update=await request(`/api/leads/${id}`,'PATCH',{saved:true,contactStatus:'CONTACTED',notes:'Проверка кириллицы; "заметки"',instagram:'https://www.instagram.com/example/',manualName:'Тест CRM'});assert.equal(update.status,200);assert.equal(update.business.lead.contactStatus,'CONTACTED');
+const verification=await request(`/api/leads/${id}`,'PATCH',{websiteStatus:'VERIFIED NO OFFICIAL WEBSITE'});assert.equal(verification.status,400);
+const unsafe=await request(`/api/leads/${id}`,'PATCH',{instagram:'javascript:alert(1)'});assert.equal(unsafe.status,400);
+const duplicate=await request('/api/search','POST',searchBody);assert.equal(duplicate.status,200);assert.equal(duplicate.leads[0].id,id);assert.equal(duplicate.leads[0].lead.notes,'Проверка кириллицы; "заметки"');
+const after=await request('/api/data?mode=demo');assert.equal(after.stats.found,before.stats.found+12);assert.equal(after.stats.saved,before.stats.saved+1);assert.equal(after.stats.contacted,before.stats.contacted+1);
+const exportResponse=await fetch(`${base}/api/export?mode=demo&format=csv&ids=${id}`);assert.equal(exportResponse.status,200);const bytes=await exportResponse.arrayBuffer();assert.deepEqual([...new Uint8Array(bytes).slice(0,3)],[239,187,191]);const csv=Buffer.from(bytes).toString('utf8');assert.ok(csv.includes('Проверка кириллицы'));assert.ok(csv.includes('DEMO DATA'));
+const xlsx=await fetch(`${base}/api/export?mode=demo&format=xlsx&ids=${id}`);assert.equal(xlsx.status,200);const workbook=new ExcelJS.Workbook();await workbook.xlsx.load(Buffer.from(await xlsx.arrayBuffer()));assert.equal(workbook.worksheets[0].rowCount,2);assert.equal(workbook.worksheets[0].getRow(2).getCell(12).value,'Проверка кириллицы; "заметки"');
+const template=await request('/api/templates','PUT',{category:'TATTOO',url:'https://example.com/tattoo'});assert.equal(template.status,200);
+const live=await request('/api/search','POST',{...searchBody,mode:'live'});assert.equal(live.status,503);assert.ok(live.error.includes('не настроен'));
+const overLimit=await request('/api/search','POST',{...searchBody,limit:101});assert.equal(overLimit.status,400);
+const crossOrigin=await request('/api/search','POST',searchBody,'https://other.example');assert.equal(crossOrigin.status,403);
+assert.equal((await request('/api/data?mode=live')).stats.found,0);
+console.log('PASS: demo search, deduplication, CRM persistence, verification, validation, CSV BOM/Cyrillic, XLSX content, template, missing key, mode isolation, same-origin protection.');
+const db=new PrismaClient({datasourceUrl:'file:./leads.db'});
+await db.search.deleteMany({where:{city:searchBody.city,mode:'demo'}});
+await db.business.deleteMany({where:{id:{in:first.leads.map(b=>b.id)},source:'demo'}});
+const previousTemplate=before.templates.find(t=>t.category==='TATTOO');
+if(previousTemplate)await db.template.update({where:{category:'TATTOO'},data:{url:previousTemplate.url}});else await db.template.deleteMany({where:{category:'TATTOO',url:'https://example.com/tattoo'}});
+await db.$disconnect();

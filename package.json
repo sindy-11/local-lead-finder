@@ -1,0 +1,11 @@
+{
+  "name": "local-lead-finder", "version": "1.0.0", "private": true,
+  "scripts": {
+    "dev": "next dev --hostname 127.0.0.1", "build": "next build --webpack", "start": "next start --hostname 127.0.0.1",
+    "typecheck": "tsc --noEmit", "lint": "eslint .", "test": "tsx --test tests/*.test.ts", "test:smoke": "node scripts/smoke.mjs",
+    "db:generate": "prisma generate", "db:migrate": "prisma migrate deploy", "db:dev": "prisma migrate dev", "db:backup": "node scripts/backup.mjs"
+  },
+  "dependencies": {"next": "^16.0.0", "react": "^19.2.0", "react-dom": "^19.2.0", "@prisma/client": "6.19.3", "lucide-react": "^0.577.0", "exceljs": "^4.4.0", "zod": "^4.0.0", "server-only": "^0.0.1"},
+  "devDependencies": {"prisma": "6.19.3", "typescript": "^5.9.0", "@types/node": "^24.0.0", "@types/react": "^19.2.0", "@types/react-dom": "^19.2.0", "eslint": "^9.0.0", "eslint-config-next": "^16.0.0", "tailwindcss": "^4.1.0", "@tailwindcss/postcss": "^4.1.0", "tsx": "^4.20.0", "dotenv": "^17.0.0"},
+  "overrides": { "deepmerge-ts": "^8.0.0", "exceljs": { "uuid": "^11.1.1" } }
+}
